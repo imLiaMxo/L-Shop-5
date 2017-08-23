@@ -28,11 +28,11 @@ if(first()){
         "Chat" = table(
             "InitWelcome" = table(
                 "String" = "Welcome to L-Shop 5! Currently running as: " + Config["StoreTitle",string] + "!\nLovingly made by Liam!",
-                "Done" = 1
+                "Done" = 0
             ),
             "HelpPopup" = table(
                 "String" = "Wire \"EGP [WIRELINK]\" to an EGP screen. Then wire \"U [WIRELINK]\" to a User. Then with the E2 tool, press R.",
-                "Done" = 1
+                "Done" = 0
             ),
             "HelpCommandList" = array(
                 "++++++++++++++++++++++",
@@ -1169,4 +1169,8 @@ if(Update){
     #else
         debug("Cannot do this function due to HTTP functions not being available!")
     #endif
+}
+
+if(last()){
+    Accounts:save(Config["SaveFile",string])
 }
