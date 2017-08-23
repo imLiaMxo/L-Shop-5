@@ -1,0 +1,1153 @@
+@name L-Shop 5
+@inputs [EGP U]:wirelink
+@persist [State E Add Page UpdatePage PriceA PriceB CheckUpdate Update UpdateConf]:number
+@persist [InsertShipment User]:entity
+@persist [Accounts Shipments Config Shipment]:table
+
+interval(100)
+runOnChat(1)
+runOnFile(1)
+runOnHTTP(1)
+runOnLast(1)
+
+if(first()){
+    #===============#
+    # CONFIGURATION #
+    #===============#
+    Config["SaveFile",string] = "lshop_5.txt"
+    Config["StoreTitle",string] = "L-Shop 5"
+    Config["MaxBalance",number] = 100000 #How much can people have in their account balance?
+    Config["Profit",string] = "5%" #<-- How much profit will you take?
+    Config["ShipmentAmount",number] = 5 #<-- How many weapons in a shipment?
+    Config["BackgroundColour",vector] = vec(0,128,128)
+    
+    
+    
+    # Do not touch anything below here.
+    Config["Text",table] = table(
+        "Chat" = table(
+            "InitWelcome" = table(
+                "String" = "Welcome to L-Shop 5! Currently running as: " + Config["StoreTitle",string] + "!\nLovingly made by Liam!",
+                "Done" = 1
+            ),
+            "HelpPopup" = table(
+                "String" = "Wire \"EGP [WIRELINK]\" to an EGP screen. Then wire \"U [WIRELINK]\" to a User. Then with the E2 tool, press R.",
+                "Done" = 1
+            ),
+            "HelpCommandList" = array(
+                "++++++++++++++++++++++",
+                "!help -- Shows this menu.",
+                "!adduser <name> -- Adds a user manually.",
+                "!addship -- Adds the shipment you're looking at.",
+                "!removeship -- Removes the shipment you're looking at.",
+                "!lban <name> <1/0> -- Bans the user from using the shop.",
+                "!save -- Saves data to " + Config["SaveFile",string] + ".",
+                "!checkupdate -- Checks for updates online.",
+                "++++++++++++++++++++++"
+            )
+        ),
+        "GUI" = table(
+            "MainMenuText" = array(
+                "Enter Store",
+                "Account Management",
+                "Upgrades [Coming Soon]",
+                "Help & Information",
+                "Save & Exit"
+            ),
+            "AccountManagementText" = array(
+                "Add Balance Funds",
+                "Withdraw Balance Funds",
+                "Purchase Tokens [Coming Soon]"
+            ),
+            "BalanceAddText" = array(
+                "+ $100",
+                "+ $1000",
+                "+ $10000",
+                "+ $100000"
+            ),
+            "BalanceWithdrawText" = array(
+                "- $100",
+                "- $1000",
+                "- $10000",
+                "- $100000"
+            )
+        )
+    )
+    Config["Version",string] = "1.0"
+    
+    function number onClick(ID) {
+        local Cursor = EGP:egpCursor(User)
+        
+        local Size = EGP:egpSize(ID) / 2
+        local A = EGP:egpPos(ID) + Size
+        local B = EGP:egpPos(ID) - Size
+        local Max = max(A, B)
+        local Min = min(A, B)
+        return inrange(Cursor, Min, Max)
+    }
+        
+    function void createUser(SteamID:string){
+        if(!Accounts:exists(SteamID)){
+            "debug"("Created player account for " + findPlayerBySteamID(SteamID):name())
+            Accounts[SteamID,table] = table(
+                # You could add more parameters here
+                "Balance" = 0,
+                "Sold" = 0,
+                "Tokens" = 0,
+                "Upgrades" = table(
+                    "VIP" = 0,
+                    "25Off" = 0,
+                    "50Off" = 0,
+                    "Premium" = 0
+                ),
+                "UpgradeCount" = 0,
+                "Banned" = 0
+            )
+        }
+    }
+    
+    function void table:load(FileName:string) {
+        fileLoad(FileName)
+        "debug"("Loading: " + FileName)
+    }
+    
+    function void table:save(FileName:string){
+  	    if(Accounts:count() > 0){
+            fileWrite(FileName,vonEncode(Accounts))
+            if(State == 0){
+                "debug"(Accounts:count() + " Users saved to the database.")
+            }
+        }
+    }
+    
+    function table calculateProfit(Price) {
+        local ProfitT = table()
+        local Profit = Config["Profit",string]
+        local ProfitAsNumber = Profit:replace("%", ""):replace("x", ""):toNumber()
+        local ProfitM = 0
+        local ProfitN = 0
+        local FinalProfit = 0
+        
+        if(Profit:find("%")) {
+            ProfitM = ProfitAsNumber / 100
+            ProfitN = Price + (Price * ProfitM)
+            FinalProfit = (Price * ProfitM)
+        } elseif(Profit:find("x")) {
+            ProfitM = ProfitAsNumber
+            ProfitN = Price * ProfitM
+            FinalProfit = (Price * ProfitM) / ProfitM
+        } else {
+            ProfitN = Price + ProfitAsNumber
+            FinalProfit = ProfitAsNumber
+        }
+        
+        ProfitT["price", number] = ProfitN
+        ProfitT["profit", number] = FinalProfit
+        
+        return ProfitT
+    }
+    
+    function void table:setBanned(SteamID:string, Value:string){
+        Accounts[SteamID,table]["Banned",number] = Value:toNumber()
+    }
+    
+    function void debug(S:string) {
+        printColor(vec(0,0,0), "[", vec(0,128,128), "L-Shop", vec(0,0,0), "]", vec(0,128,128), ": ", vec(255,255,255), S:replace("ulx psay", ""))
+    }
+    
+    setName("L-Shop 5: Running As: " + Config["StoreTitle",string])
+    State = -3
+    #State = 10
+    #User = owner()
+    U:entity():setPos(entity():pos() + vec(0,0,25))
+    U:entity():setAlpha(0)
+    Accounts:load(Config["SaveFile",string])
+}
+
+if(changed(round(State))){
+    local State = round(State)
+    EGP:egpClear()
+    
+    EGP:egpBox(1,vec2(256,256),vec2(526,526))
+    EGP:egpMaterial(1,"gui/gradient_down")
+    EGP:egpColor(1,Config["BackgroundColour",vector])
+    
+    if(State > 0){
+        EGP:egpText(egpMaxObjects(),"Current User: ",vec2(256,480))
+        EGP:egpSize(egpMaxObjects(),15)
+        EGP:egpAlign(egpMaxObjects(),1)
+    }
+        
+    if(State == -3){
+        EGP:egpBox(2,vec2(256,256),vec2(395,45))
+        EGP:egpColor(2,vec(45,45,45))
+        
+        EGP:egpBox(3,vec2(256,256),vec2(0,40))
+        EGP:egpColor(3,vec(0,255,0))
+        
+        EGP:egpText(4,"Loading " + Config["SaveFile",string] + " 0%",vec2(256,240))
+        EGP:egpAlign(4,1)
+        EGP:egpSize(4,30)
+        
+        EGP:egpText(5,"L-Shop 5",vec2(256,50))
+        EGP:egpAlign(5,1,5)
+        EGP:egpSize(5,35)
+        
+        EGP:egpText(6,"Lovingly made by Liam",vec2(256,65))
+        EGP:egpAlign(6,1,6)
+        EGP:egpSize(6,15)
+        
+        EGP:egpText(7,"Found: 0 Accounts.",vec2(256,276))
+        EGP:egpSize(7,30)
+        EGP:egpAlign(7,1)
+        EGP:egpAlpha(7,0)
+    }
+    
+    if(State == -2){
+        EGP:egpText(5,"You're Banned",vec2(256,50))
+        EGP:egpAlign(5,1,5)
+        EGP:egpSize(5,35)
+        
+        EGP:egpText(6,"Go On! Fuck Off!",vec2(256,65))
+        EGP:egpAlign(6,1,6)
+        EGP:egpSize(6,15)
+        timer("reset",2500)
+    }
+    
+    if(State == -1){
+        EGP:egpTextLayout(2,"Unable to load: " + Config["SaveFile",string],vec2(30,20),vec2(500,350))
+        EGP:egpSize(2,30)
+    }
+    
+    if(State == 0){
+        if(!Config["Text",table]["Chat",table]["InitWelcome",table]["Done",number]){
+            debug(Config["Text",table]["Chat",table]["InitWelcome",table]["String",string])
+            Config["Text",table]["Chat",table]["InitWelcome",table]["Done",number] = 1
+        }
+        
+        EGP:egpCircle(2,vec2(256,200),vec2(83,83))
+        EGP:egpColor(2,Config["BackgroundColour",vector] - vec(0,10,0))
+        
+        EGP:egpCircle(3,vec2(256,200),vec2(80,80))
+        EGP:egpColor(3,vec(45,45,45))
+        
+        EGP:egpBox(5,vec2(256,256),vec2(512,60))
+        EGP:egpColor(5,vec(45,45,45))
+        
+        EGP:egpBoxOutline(6,vec2(256,256),vec2(512,60))
+        EGP:egpColor(6,Config["BackgroundColour",vector] - vec(0,10,0))
+        EGP:egpSize(6,2)
+        
+        EGP:egpText(7,Config["StoreTitle",string],vec2(256,261))
+        EGP:egpSize(7,35)
+        EGP:egpAlign(7,1,7)
+        
+        EGP:egpText(8,"Press USE here to begin!",vec2(256,281))
+        EGP:egpSize(8,30)
+        EGP:egpAlign(8,1,8)
+        
+        EGP:egpBox(9,vec2(256,186),vec2(100,100))
+        EGP:egpMaterial(9,"gui/gmod_logo")
+    }
+    
+    if(State == 1){
+        #Main Menu GUI#
+        EGP:egpRoundedBoxOutline(2,vec2(256,256),vec2(482,426))
+        EGP:egpSize(2,2)
+        
+        EGP:egpText(3,"Main Menu",vec2(256,6))
+        EGP:egpSize(3,30)
+        EGP:egpAlign(3,1)
+        
+        for(I = 1, 5){
+            EGP:egpRoundedBoxOutline(I + 9,vec2(256,(26 + (I * 66))),vec2(400,40))
+            EGP:egpSize(I + 9,2)
+            
+            EGP:egpText(I + 16,Config["Text",table]["GUI",table]["MainMenuText",array][I,string],vec2(256,(26 + (I * 66))))
+            EGP:egpSize(I + 16,25)
+            EGP:egpAlign(I + 16,1,1)
+        }
+        if(Shipments:count() < 1){
+            EGP:egpColor(10,vec(128,0,0))
+        } else {
+            EGP:egpColor(10,vec(255,255,255))
+        }
+    }
+    
+    if(State == 2){
+        #Account Create GUI#
+        EGP:egpRoundedBoxOutline(2,vec2(256,256),vec2(482,426))
+        EGP:egpSize(2,2)
+        
+        EGP:egpText(3,"Account Creation",vec2(256,6))
+        EGP:egpSize(3,30)
+        EGP:egpAlign(3,1)
+        
+        EGP:egpTextLayout(4,"In order to use L-Shop 5, you must have an account. This allows you to use our store and keep track of everything you purchase.\n\nThere is no cost for creating an account however if you wish to purchase upgrades they will be available in the \ \"Upgrades\" menu. \n\nDo you wish to create an account?",vec2(26,56),vec2(452,(426-56)))
+        EGP:egpSize(4,20)
+        EGP:egpAlign(4,1)
+        
+        #YesButton [50]
+        EGP:egpRoundedBoxOutline(50,vec2(256 - (156 / 2) - 1,356),vec2(156,45))
+        EGP:egpColor(50,vec(0,128,0))
+
+        #NoButton  [60]
+        EGP:egpRoundedBoxOutline(60,vec2(256 + (156 / 2) + 1,356),vec2(156,45))
+        EGP:egpColor(60,vec(128,0,0))
+        
+        #YesButtonText [7]
+        EGP:egpText(7,"Create",vec2(256 - (156 / 2) - 1,356))
+        EGP:egpSize(7,25)
+        EGP:egpAlign(7,1,1)
+        
+        #NoButtonText  [8]
+        EGP:egpText(8,"Cancel",vec2(256 + (156 / 2) + 1,356))
+        EGP:egpSize(8,25)
+        EGP:egpAlign(8,1,1)
+    }
+    
+    if(State == 3){
+        EGP:egpRoundedBoxOutline(2,vec2(256,256),vec2(482,426))
+        EGP:egpSize(2,2)
+        
+        EGP:egpText(3,"Help & Information",vec2(256,6))
+        EGP:egpSize(3,30)
+        EGP:egpAlign(3,1)
+        
+        EGP:egpTextLayout(20,"What is L-Shop 5:\nL-Shop 5 is a fully automatic, advanced gunshop which determines prices automatically to make it fair.\n\nUpgrades:\nUpgrades are added to your account onced purchased via the \ \"Upgrades\" menu (screen prior to this). These will last aslong as you keep your account with us.\n\nAccount Modifications:\nYou can edit your account balance and withdraw cash into RP cash. Or you can purchase free weapon tokens which can be used in the future. If you wish to delete your account, you can do it here. However if you do remove your account, everything will be reset once a new one is recreated.",vec2(26,56),vec2(452,(426-56)))
+        EGP:egpSize(20,20)
+        EGP:egpAlign(20,1)
+        
+        EGP:egpRoundedBoxOutline(21,vec2(256,426),vec2(126,45))
+        EGP:egpSize(21,2)
+        
+        EGP:egpText(22,"Go Back",vec2(256,426))
+        EGP:egpSize(22,25)
+        EGP:egpAlign(22,1,1)
+    }
+    
+    if(State == 4){
+        #Upgrades [Coming Soon]
+    }
+    
+    if(State == 5){
+        #Account Management GUI
+        EGP:egpRoundedBoxOutline(2,vec2(256,256),vec2(482,426))
+        EGP:egpSize(2,2)
+        
+        EGP:egpText(3,"Account Management",vec2(256,6))
+        EGP:egpSize(3,30)
+        EGP:egpAlign(3,1)
+        
+        EGP:egpRoundedBoxOutline(23,vec2(256,126),vec2(450,136))
+        EGP:egpSize(23,2)
+        
+        EGP:egpText(24,"Current Stats:",vec2(256,58))
+        EGP:egpSize(24,25)
+        EGP:egpAlign(24,1)
+        
+        EGP:egpTextLayout(25,"Balance: $" + Accounts[User:steamID(),table]["Balance",number] + "\nPurchases: " + Accounts[User:steamID(),table]["Sold",number]+ "\nUpgrades: " + Accounts[User:steamID(),table]["UpgradeCount",number] +"\nTokens: " + Accounts[User:steamID(),table]["Tokens",number] + "\nBanned: NO",vec2(26,86),vec2(452,200))
+        EGP:egpSize(25,20)
+        EGP:egpAlign(25,1)
+        
+        for(I = 1, 3){
+            EGP:egpRoundedBoxOutline(26 + I,vec2(256, (176 + (I * 55))),vec2(400,40))
+            EGP:egpSize(26 + I,2)
+            
+            EGP:egpText(30 + I,Config["Text",table]["GUI",table]["AccountManagementText",array][I,string],vec2(256, (176 + (I * 55))))
+            EGP:egpSize(30 + I,25)
+            EGP:egpAlign(30 + I,1,1)
+        }
+    
+        EGP:egpRoundedBoxOutline(34,vec2(256,426),vec2(126,45))
+        EGP:egpSize(34,2)
+        
+        EGP:egpText(35,"Go Back",vec2(256,426))
+        EGP:egpSize(35,25)
+        EGP:egpAlign(35,1,1)
+    }
+    
+    if(State == 6){
+        Add = 0
+        local CanAdd = (Config["MaxBalance",number] - Accounts[User:steamID(),table]["Balance",number])
+        EGP:egpRoundedBoxOutline(2,vec2(256,256),vec2(482,426))
+        EGP:egpSize(2,2)
+        
+        EGP:egpText(3,"Adding Balance Funds",vec2(256,6))
+        EGP:egpSize(3,30)
+        EGP:egpAlign(3,1)
+        
+        EGP:egpRoundedBoxOutline(36,vec2(256,86),vec2(450,76))
+        EGP:egpSize(36,2)
+        
+        EGP:egpTextLayout(37,"Current Balance: $" + Accounts[User:steamID(),table]["Balance",number] + "\nYou can add: $" + CanAdd + "\n5% Adding Fee",vec2(26,46),vec2(452,200))
+        EGP:egpSize(37,25)
+        EGP:egpAlign(37,1)
+        
+        EGP:egpText(38,"$" + Add,vec2(256,156))
+        EGP:egpSize(38,35)
+        EGP:egpAlign(38,1)
+        
+        for(I = 1, 4){
+            # + row
+            EGP:egpRoundedBoxOutline(I + 39,vec2((-26 + (I * 112)),236),vec2(112,45))
+            EGP:egpSize(I + 39,2)
+            
+            EGP:egpText(I + 43,Config["Text",table]["GUI",table]["BalanceAddText",array][I,string],vec2((-26 + (I * 112)),236))
+            EGP:egpSize(I + 43,22)
+            EGP:egpAlign(I + 43,1,1)
+            
+            # - row
+            EGP:egpRoundedBoxOutline(I + 47,vec2((-26 + (I * 112)),286),vec2(112,45))
+            EGP:egpSize(I + 47,2)
+            
+            EGP:egpText(I + 51,Config["Text",table]["GUI",table]["BalanceWithdrawText",array][I,string],vec2((-26 + (I * 112)),286))
+            EGP:egpSize(I + 51,22)
+            EGP:egpAlign(I + 51,1,1)
+        }
+        EGP:egpRoundedBoxOutline(56,vec2(256,426),vec2(156,45))
+        EGP:egpSize(56,2)
+        
+        EGP:egpText(57,"Confirm / Exit",vec2(256,426))
+        EGP:egpSize(57,25)
+        EGP:egpAlign(57,1,1)
+    }
+    
+    if(State == 7){
+        Add = 0
+        local CanAdd = Accounts[User:steamID(),table]["Balance",number]
+        EGP:egpRoundedBoxOutline(2,vec2(256,256),vec2(482,426))
+        EGP:egpSize(2,2)
+        
+        EGP:egpText(3,"Withdrawing Balance Funds",vec2(256,6))
+        EGP:egpSize(3,30)
+        EGP:egpAlign(3,1)
+        
+        EGP:egpRoundedBoxOutline(36,vec2(256,86),vec2(450,76))
+        EGP:egpSize(36,2)
+        
+        EGP:egpTextLayout(58,"Current Balance: $" + Accounts[User:steamID(),table]["Balance",number] + "\nYou can Remove: $" + CanAdd + "\nFree Withdrawals",vec2(26,46),vec2(452,200))
+        EGP:egpSize(58,25)
+        EGP:egpAlign(58,1)
+        
+        EGP:egpText(59,"$" + Add,vec2(256,156))
+        EGP:egpSize(59,35)
+        EGP:egpAlign(59,1)
+        
+        for(I = 1, 4){
+            # + row
+            EGP:egpRoundedBoxOutline(I + 60,vec2((-26 + (I * 112)),236),vec2(112,45))
+            EGP:egpSize(I + 60,2)
+            
+            EGP:egpText(I + 65,Config["Text",table]["GUI",table]["BalanceAddText",array][I,string],vec2((-26 + (I * 112)),236))
+            EGP:egpSize(I + 65,22)
+            EGP:egpAlign(I + 65,1,1)
+            
+            # - row
+            EGP:egpRoundedBoxOutline(I + 70,vec2((-26 + (I * 112)),286),vec2(112,45))
+            EGP:egpSize(I + 70,2)
+            
+            EGP:egpText(I + 76,Config["Text",table]["GUI",table]["BalanceWithdrawText",array][I,string],vec2((-26 + (I * 112)),286))
+            EGP:egpSize(I + 76,22)
+            EGP:egpAlign(I + 76,1,1)
+        }
+        EGP:egpRoundedBoxOutline(81,vec2(256,426),vec2(156,45))
+        EGP:egpSize(81,2)
+        
+        EGP:egpText(82,"Confirm / Exit",vec2(256,426))
+        EGP:egpSize(82,25)
+        EGP:egpAlign(82,1,1)
+    }
+    
+    if(State == 8){
+        #Tokens GUI
+    }
+    
+    if(State == 9){
+        UpdatePage = 1
+        #STORE GUI FUCKING FINALLY!
+        EGP:egpRoundedBoxOutline(2,vec2(256,256),vec2(482,426))
+        EGP:egpSize(2,2)
+        
+        EGP:egpText(3,"Store",vec2(256,6))
+        EGP:egpSize(3,30)
+        EGP:egpAlign(3,1)
+        
+        EGP:egpText(84,"Page " + Page + "/" + Shipments:count(),vec2(256,46))
+        EGP:egpSize(84,20)
+        EGP:egpAlign(84,1)
+        
+        EGP:egpText(85,"Loading...",vec2(256,86))
+        EGP:egpSize(85,30)
+        EGP:egpAlign(85,1)
+        
+        EGP:egpText(86,"Loading...",vec2(256,109))
+        EGP:egpSize(86,27)
+        EGP:egpColor(86,vec(0,128,0))
+        EGP:egpAlign(86,1)
+        
+        EGP:egpText(87,"Loading...",vec2(256,132))
+        EGP:egpSize(87,25)
+        EGP:egpAlign(87,1)
+        
+        # Previous
+        EGP:egpRoundedBoxOutline(88,vec2(256 - (156 / 2) - 1,356),vec2(156,45))
+        EGP:egpColor(88,vec(0,128,0))
+
+        # Next
+        EGP:egpRoundedBoxOutline(89,vec2(256 + (156 / 2) + 1,356),vec2(156,45))
+        EGP:egpColor(89,vec(128,0,0))
+        
+        # Purchase
+        EGP:egpRoundedBoxOutline(90,vec2(256,(356 - 48)),vec2(156,45))
+        
+        # Go Back
+        EGP:egpRoundedBoxOutline(91,vec2(256,(356 + 48)),vec2(156,45))
+        
+        EGP:egpText(92,"Prev",vec2(256 - (156 / 2) - 1,356))
+        EGP:egpSize(92,25)
+        EGP:egpAlign(92,1,1)
+        
+        EGP:egpText(93,"Next",vec2(256 + (156 / 2) + 1,356))
+        EGP:egpSize(93,25)
+        EGP:egpAlign(93,1,1)
+        
+        EGP:egpText(94,"Purchase",vec2(256,(356 - 48)))
+        EGP:egpSize(94,25)
+        EGP:egpAlign(94,1,1)
+        
+        EGP:egpText(95,"Exit Store",vec2(256,(356 + 48)))
+        EGP:egpSize(95,25)
+        EGP:egpAlign(95,1,1)
+        
+        holoCreate(1)
+        holoModel(1,"models/props_c17/streetsign004e.mdl")
+        holoPos(1,EGP:egpToWorld(vec2(256, 220)))
+        holoAng(1,EGP:entity():toWorld(ang(0, -90, 90)))
+        holoScale(1,vec(0.5))
+        
+    }
+    
+    if(State == 10){
+        holoPos(1,EGP:egpToWorld(vec2(256, 256)))
+        local Shipment = Shipments[Page,table]
+        local Balance = Accounts[User:steamID(),table]["Balance",number]
+        PriceA = Shipment["price",table]["price",number]
+        if(Balance >= PriceA){ PriceB = 0 }elseif(Balance < PriceA){ PriceB = (PriceA - Balance) } else { PriceB = PriceA }
+        EGP:egpRoundedBoxOutline(2,vec2(256,256),vec2(482,426))
+        EGP:egpSize(2,2)
+        
+        EGP:egpText(3,"Order Confirmation",vec2(256,6))
+        EGP:egpSize(3,30)
+        EGP:egpAlign(3,1)
+        
+        EGP:egpTextLayout(96,"Here are your order details:\n\nWeapon: " + Shipment["name",string] + "\nPrice: $"+ Shipment["price",table]["price",number] +"\nPrice Inc. Balance/Discounts: $" + PriceB +"\n\nAre these correct?",vec2(26,56),vec2(452,(426-56)))
+        EGP:egpSize(96,20)
+        EGP:egpAlign(96,1)
+        
+        EGP:egpRoundedBoxOutline(97,vec2(256 - (156 / 2) - 1,356),vec2(156,45))
+        EGP:egpColor(97,vec(0,128,0))
+
+        EGP:egpRoundedBoxOutline(98,vec2(256 + (156 / 2) + 1,356),vec2(156,45))
+        EGP:egpColor(98,vec(128,0,0))
+        
+        EGP:egpText(99,"Pay",vec2(256 - (156 / 2) - 1,356))
+        EGP:egpSize(99,25)
+        EGP:egpAlign(99,1,1)
+        
+        EGP:egpText(100,"Cancel",vec2(256 + (156 / 2) + 1,356))
+        EGP:egpSize(100,25)
+        EGP:egpAlign(100,1,1)
+    }
+    
+    if(State == 11){
+        timer("init",100)
+        EGP:egpRoundedBoxOutline(2,vec2(256,256),vec2(482,426))
+        EGP:egpSize(2,2)
+        
+        EGP:egpText(3,"Dispensing Weapon",vec2(256,6))
+        EGP:egpSize(3,30)
+        EGP:egpAlign(3,1)
+        
+        EGP:egpTextLayout(96,"Your " + Shipment["name",string] + " is currently being dispensed. Thank you for buying with us!",vec2(26,56),vec2(452,(426-56)))
+        EGP:egpSize(96,20)
+        EGP:egpAlign(96,1)
+        
+        EGP:egpText(97,"Processing Order...",vec2(256,126))
+        EGP:egpSize(97,30)
+        EGP:egpAlign(97,1,1)
+        EGP:egpAlpha(97,0)
+        
+        EGP:egpText(98,"Firing User...",vec2(256,156))
+        EGP:egpSize(98,30)
+        EGP:egpAlign(98,1,1)
+        EGP:egpAlpha(98,0)
+        
+        EGP:egpText(99,"Waiting Weapon's Arrival...",vec2(256,186))
+        EGP:egpSize(99,30)
+        EGP:egpAlign(99,1,1)
+        EGP:egpAlpha(99,0)
+        
+        EGP:egpText(100,"Weapon Delivered",vec2(256,216))
+        EGP:egpSize(100,30)
+        EGP:egpAlign(100,1,1)
+        EGP:egpAlpha(100,0)
+        
+        EGP:egpRoundedBoxOutline(101,vec2(256 - (156 / 2) - 1,356),vec2(156,45))
+        EGP:egpColor(101,vec(0,128,0))
+        EGP:egpAlpha(101,0)
+
+        EGP:egpRoundedBoxOutline(102,vec2(256 + (156 / 2) + 1,356),vec2(156,45))
+        EGP:egpColor(102,vec(128,0,0))
+        EGP:egpAlpha(102,0)
+        
+        EGP:egpText(103,"Order More",vec2(256 - (156 / 2) - 1,356))
+        EGP:egpSize(103,20)
+        EGP:egpAlign(103,1,1)
+        EGP:egpAlpha(103,0)
+        
+        EGP:egpText(104,"Main Menu",vec2(256 + (156 / 2) + 1,356))
+        EGP:egpSize(104,20)
+        EGP:egpAlign(104,1,1)
+        EGP:egpAlpha(104,0)
+    }
+}
+
+if(chatClk(owner())){
+    local Msg = owner():lastSaid():explode(" ")
+    local Cmd = Msg[1,string]
+    local FileName = Config["SaveFile",string]
+    
+    if(Cmd == "!help"){
+        hideChat(1)
+        foreach(K, V:string = Config["Text",table]["Chat",table]["HelpCommandList",array]){
+            debug(V)
+        }
+    }
+    
+    if(Cmd == "!addship"){
+        hideChat(1)
+        if(owner():aimEntity():type() == "spawned_shipment") {
+            local Ship = owner():aimEntity()
+            if(Ship:type() != "spawned_shipment") {
+                hint("What the fuck are you trying to add?",5)
+            }
+            local BeingSold = 0
+            for(I = 1, Shipments:count()) {
+                local Ent = Shipments[I, table]["entity", entity]
+                if(Ent:shipmentType() == Ship:shipmentType()) {
+                    BeingSold = 1
+                    debug("That gun is already being sold!")
+                }
+            }
+            
+            if(!BeingSold) {
+                if(Ship:isValid() & Ship:type() == "spawned_shipment") {
+                    local ShipmentData = table()
+                    ShipmentData["entity", entity] = Ship
+                    ShipmentData["name", string] = Ship:shipmentName():replace("x10",""):replace("x5",""):replace("x1",""):replace("[VIP]","")
+                    ShipmentData["price", table] = calculateProfit(Ship:shipmentPrice() / Config["ShipmentAmount",number])
+                    ShipmentData["model", string] = Ship:shipmentModel()
+                    Shipments:pushTable(ShipmentData)
+                    debug("Added " + ShipmentData["name", string] + " to sale for $" + round(ShipmentData["price", table]["price", number]) + " ($" + round(ShipmentData["price", table]["profit", number]) + " profit) each.")
+                }
+            }
+        }
+    }
+    
+    if(Cmd == "!removeship"){
+        hideChat(1)
+        if(owner():aimEntity():type() == "spawned_shipment") {
+            local Ship = owner():aimEntity()
+            if(Ship:type() != "spawned_shipment") {
+                hint("What the fuck are you trying to add?",5)
+            }
+            for(I = 1, Shipments:count()) {
+                local Ent = Shipments[I, table]["entity", entity]
+                if(Ent:shipmentType() == Ship:shipmentType()) {
+                    debug("Removed shipment of " + Shipments[I, table]["name",string])
+                    Shipments:remove(I)
+                }
+            }
+        }
+    }
+    
+    if(Cmd == "!adduser"){
+        hideChat(1)
+        createUser(findPlayerByName(Msg[2,string]):steamID())
+    }
+    if(Cmd == "!save"){
+        hideChat(1)
+        Accounts:save(FileName)
+    }
+    if(Cmd == "!lban"){
+        if(!Msg[2,string]){
+            debug("Invalid syntax...")
+        } else {
+            local Ply = findPlayerByName(Msg[2,string])
+            if(Ply:isPlayer()){
+                local SteamID = Ply:steamID()
+                if(!Accounts:exists(SteamID)){
+                    createUser(SteamID)
+                }
+                if(!Msg[3,string]){
+                    debug("Invalid Syntax...")
+                } else {
+                    if(Msg[3,string] == "1"){
+                        Accounts:setBanned(SteamID,"1")
+                        debug("Banned " + Ply:name() + " from using the E2.")
+                    } elseif(Msg[3,string] == "0"){
+                        Accounts:setBanned(SteamID,"0")
+                        debug("Unbanned " + Ply:name() + " from using the E2.")
+                    }
+                }
+            } else {
+                debug("No player found...")
+            }
+        }
+    }
+}
+
+if(fileClk()){
+    local FileName = Config["SaveFile",string]
+    if(fileClk(FileName)){
+        Info = table()
+        Info = vonDecodeTable(fileRead())
+        Accounts = Info
+        debug("File loaded, " + Accounts:count() + " users found.")
+        EGP:egpSetText(7,"Found: " + Accounts:count() + " Account(s).")
+        EGP:egpAlpha(7,255)
+        timer("finish_load",5000)                 
+    } else {
+        debug("File could not be loaded")
+        State = -1
+    }
+}
+
+if(clk("finish_load")){
+    State = 0
+    if(!EGP || !U){
+        if(!Config["Text",table]["Chat",table]["HelpPopup",table]["Done",number]){
+            debug(Config["Text",table]["Chat",table]["HelpPopup",table]["String",string])
+            Config["Text",table]["Chat",table]["HelpPopup",table]["Done",number] = 1
+        }
+    }
+}
+if(clk("reset")){
+    State = 0
+    exit()
+}
+
+if(State == -3){
+    Percent = round(EGP:egpSize(3):x() * 100 / 390)
+    EGP:egpSize(3,clamp(EGP:egpSize(3) + vec2(10,0), vec2(0,40),vec2(390, 40)))
+    EGP:egpSetText(4,"Loading " + Config["SaveFile",string] + " " + Percent + "%")
+}
+
+if(State == 0){
+    if(EGP["User",entity]:isPlayer()){
+        User = EGP["User",entity]
+        if(!Accounts:exists(User:steamID())){
+            State = 2
+        } else {
+            if(Accounts[User:steamID(),table]["Banned",number]){
+                State = -2
+            } else {
+                State = 1
+            }
+        }
+    }
+}
+
+# Checking if the wanker has ran away.
+if(State > 0 && User:isPlayer()){
+    #Did the wanker run away?
+    if(User:pos():distance(EGP:entity():pos()) > 250){
+        #HeDid? Well fuck you.
+        State = 0
+        exit()
+    } else {
+        #HeDidnt? Good boy :).
+    }
+    
+    EGP:egpSetText(egpMaxObjects(),"Current User: " + User:name())
+}
+
+if(State == 1){
+    #State 1 shit here
+    local E = User:keyUse()
+    if(changed(E) & E){
+        if(onClick(14)){ #Save'n'Exit
+            Accounts:save(Config["SaveFile",string])
+            State = 0
+            exit()
+        }
+        if(onClick(13)){ #Help'n'Info
+            State = 3
+        }
+        if(onClick(11)){ #AccountManage
+            State = 5
+        }
+        if(onClick(10)){ #EnterShop
+            if(Shipments:count() >= 1){
+                State = 9
+                Page = 1
+            } else {
+                soundPlay("error",0,"buttons/button11.wav")
+            }
+        }
+    }
+    
+    if(changed(round(Shipments:count()))){
+        if(Shipments:count() < 1){
+            EGP:egpColor(10,vec(128,0,0))
+        } else {
+            EGP:egpColor(10,vec(255,255,255))
+        }
+    }
+}
+
+if(State == 2){
+    local E = User:keyUse()
+    if(changed(E) & E){
+        if(onClick(50)){
+            # Yes clk
+            createUser(User:steamID())
+            #State = 1
+            State = 0
+        }
+        if(onClick(60)){
+            # No clk
+            State = 0
+            exit()
+        }
+    }
+}
+
+if(State == 3){
+    local E = User:keyUse()
+    if(changed(E) & E){
+        if(onClick(21)){
+            State = 1
+        }
+    }
+}
+
+if(State == 5){
+    local E = User:keyUse()
+    if(changed(E) & E){
+        if(onClick(27)){
+            State = 6
+        }
+        if(onClick(28)){
+            State = 7
+        }
+        if(onClick(34)){
+            State = 1
+        }
+    }
+}
+
+if(State == 6){
+    local Allowed = (Config["MaxBalance",number] - Accounts[User:steamID(),table]["Balance",number])
+    local LastAmount = Accounts[User:steamID(),table]["Balance",number]
+    local E = User:keyUse()
+    if(changed(E) & E){
+        if(onClick(40)){
+            if(Add < Allowed){
+                Add += clamp(Allowed,Add,100)
+            }
+        }
+        if(onClick(41)){
+            if(Add < Allowed){
+                Add += clamp(Allowed,Add,1000)
+            }
+        }
+        if(onClick(42)){
+            if(Add < Allowed){
+                Add += clamp(Allowed,Add,10000)
+            }
+        }
+        if(onClick(43)){
+            if(Add < Allowed){
+                Add += clamp(Allowed,Add,100000)
+            }
+        }
+        
+        if(onClick(48)){
+            if(Add > 0){
+                Add -= clamp(Allowed,0,100)
+            }
+        }
+        if(onClick(49)){
+            if(Add > 0){
+                Add -= clamp(Allowed,0,1000)
+            }
+        }
+        if(onClick(50)){
+            if(Add > 0){
+                Add -= clamp(Allowed,0,10000)
+            }
+        }
+        if(onClick(51)){
+            if(Add > 0){
+                Add -= clamp(Allowed,0,100000)
+            }
+        }
+        
+        #Pay/Exit
+        if(onClick(56)){
+            if(!Add){
+                State = 5
+            } else {
+                local Fee = (Add * 0.05)
+                moneyRequest(User,(Add + Fee),"L-Shop 5 -> $"+ Add + " Balance Add. ($" + Fee + " adding fee.)")
+            }
+        }
+    }
+    
+    if(moneyClk()){
+        local Ply = moneyClkPlayer()
+        Accounts[Ply:steamID(),table]["Balance",number] = (LastAmount + Add)
+        State = 5
+        Accounts:save(Config["SaveFile",string])
+    } elseif(moneyNoClk()){
+        State = 5
+    }
+    
+    if(Add < 0){Add = 0} elseif(Add > Allowed){ Add = Allowed }
+    
+    if(changed(Add)){
+        EGP:egpSetText(38,"$" + Add)
+    }
+}
+
+if(State == 7){
+    local Allowed = Accounts[User:steamID(),table]["Balance",number]
+    local LastAmount = Accounts[User:steamID(),table]["Balance",number]
+    local E = User:keyUse()
+    if(changed(E) & E){
+        if(onClick(61)){
+            if(Add < Allowed){
+                Add += clamp(Allowed,Add,100)
+            }
+        }
+        if(onClick(62)){
+            if(Add < Allowed){
+                Add += clamp(Allowed,Add,1000)
+            }        
+        }
+        if(onClick(63)){
+            if(Add < Allowed){
+                Add += clamp(Allowed,Add,10000)
+            }
+        }
+        if(onClick(64)){
+            if(Add < Allowed){
+                Add += clamp(Allowed,Add,100000)
+            }
+        }
+        if(onClick(71)){
+            if(Add > 0){
+                Add -= clamp(Allowed,0,100)
+            }
+        }
+        if(onClick(72)){
+            if(Add > 0){
+                Add -= clamp(Allowed,0,1000)
+            }
+        }
+        if(onClick(73)){
+            if(Add > 0){
+                Add -= clamp(Allowed,0,10000)
+            }
+        }
+        if(onClick(74)){
+            if(Add > 0){
+                Add -= clamp(Allowed,0,100000)
+            }
+        }
+        
+        #Pay/Exit
+        if(onClick(81)){
+            if(!Add){
+                State = 5
+            } else {
+                moneyGive(User,Add)
+                Accounts[User:steamID(),table]["Balance",number] = (LastAmount - Add)
+                State = 5
+                Accounts:save(Config["SaveFile",string])
+            }
+        }
+    }
+
+    if(Add < 0){Add = 0} elseif(Add > Allowed){ Add = Allowed }
+    if(changed(Add)){
+        EGP:egpSetText(59,"$" + Add)
+    }
+        
+}
+
+if(State == 9){
+    local E = User:keyUse()
+    if(changed(E) & E){
+        if(onClick(88)){
+            Page--
+            if(Page <= 0) {Page = Shipments:count()}
+            UpdatePage = 1
+        }
+        if(onClick(89)){
+            Page++
+            if(Page > Shipments:count()) {Page = 1}
+            UpdatePage = 1
+        }
+        if(onClick(90)){
+            State = 10
+        }
+        if(onClick(91)){
+            State = 1
+        }
+    }
+    
+    if(UpdatePage) {
+        UpdatePage = 0
+        EGP:egpSetText(84,"Page " + Page + " / " + Shipments:count())
+        local Shipment = Shipments[Page, table]
+        holoModel(1,Shipment["model",string])
+        EGP:egpSetText(85,Shipment["name",string])
+        EGP:egpSetText(86,"Price: $" +round(Shipment["price", table]["price", number]))
+        EGP:egpSetText(87,"Remaining: " + Shipment["entity",entity]:shipmentAmount() + " / " + Config["ShipmentAmount",number])
+    }
+
+}
+
+if(State == 10){
+    local E = User:keyUse()
+    if(changed(E) & E){
+        if(onClick(97)){
+            if(PriceB == 0){
+                State = 11
+                Accounts[User:steamID(),table]["Sold",number] = (Accounts[User:steamID(),table]["Sold",number] + 1)
+                Accounts[User:steamID(),table]["Balance",number] = (Accounts[User:steamID(),table]["Balance",number] - PriceA)
+            } else {
+                moneyRequest(User,PriceB,"L-Shop 5 -> Checkout")
+                local Balance = Accounts[User:steamID(),table]["Balance",number]
+                NewBalance = PriceA - PriceB
+                #print(NewBalance)
+            }
+        }
+        if(onClick(98)){
+            State = 9
+        }
+    }
+    
+    if(moneyClk()){
+        Accounts[User:steamID(),table]["Sold",number] = (Accounts[User:steamID(),table]["Sold",number] + 1)
+        Accounts[User:steamID(),table]["Balance",number] = NewBalance
+        State = 11
+        #timer("init",100)
+    }
+    if(moneyNoClk()){
+        State = 9
+    }
+}
+
+if(State == 9 || State == 10){ holoAng(1,EGP:entity():toWorld(ang(0, -90 + (sin(curtime()*45)*15), 90))) } else { holoDelete(1) }
+
+if(State == 11){
+    if(clk("init")){
+        local Time = randint(2000,5000)
+        EGP:egpAlpha(97,255)
+        U:entity():setPos(Shipments[Page,table]["entity",entity]:pos() + vec(0,0,20))
+        timer("fire",Time)
+    }
+    if(clk("fire")){
+        EGP:egpAlpha(98,255)
+        U["Fire",number] = 1
+        timer("wait_1",2500)
+    }
+    if(clk("wait_1")){
+        EGP:egpAlpha(99,255)
+        timer("move_back",2000)
+    }
+    if(clk("move_back")){
+        EGP:egpAlpha(100,255)
+        U:entity():setPos(entity():pos() + vec(0,0,25))
+        timer("show_options",100)
+        for(I = 1, Shipments:count()){
+            if(Shipments[I,table]["entity",entity]:shipmentAmount() < 1){
+                debug("Removed empty shipment of " + Shipments[I,table]["name",string])
+                Shipments:remove(I)
+            } else {
+                debug(Shipments[I,table]["name",string] + " now has " + Shipments[I,table]["entity",entity]:shipmentAmount() + " left.")
+            }
+        }
+    }
+    if(clk("show_options")){
+        for(I = 101, 104){
+            EGP:egpAlpha(I,255)
+        }
+    }
+    
+    local E = User:keyUse()
+    if(changed(E) & E){
+        if(onClick(101) && EGP:egpAlpha(101) == 255){
+            State = 10
+        }
+        if(onClick(102) && EGP:egpAlpha(102) == 255){
+            State = 1
+        }
+    }
+}
+
+## Auto Updating
+if(CheckUpdate){
+    #ifdef httpCanRequest()
+        httpRequest("https://raw.githubusercontent.com/imLiaMxo/L-Shop-5/master/VERSION")   
+        if(httpClk() & httpRequestUrl() == "https://raw.githubusercontent.com/imLiaMxo/L-Shop-5/master/VERSION"){
+            Config["NewVersion",string] = httpData():trim()
+            timer("update verify",1000)
+        }
+        if(clk("update verify")){
+            if(Config["Version",string] != Config["NewVersion",string]){
+                debug("New Version Detected: Type !update to download version [" + Config["NewVersion",string] + "]")
+                UpdateConf = 1
+                CheckUpdate = 0
+            } else {
+                debug("You're currently up to date!")
+                CheckUpdate = 0
+                UpdateConf = 0
+            }
+        }
+    #else
+        debug("Cannot do this function due to HTTP functions not being available!")
+    #endif
+}
+
+if(Update){
+    #ifdef httpCanRequest()
+        timer("begin_update",1000)
+        if(clk("begin_update")){
+            if(httpCanRequest()){
+                httpRequest("https://raw.githubusercontent.com/imLiaMxo/L-Shop-5/master/l-shop5.txt")
+            } else {
+                debug("Cannot reach address to update, please try again or download manually. How to is on the github.")
+                debug("https://github.com/imLiaMxo/L-Shop-5/blob/master/README.md")
+            }
+        }
+        if(httpClk() & httpRequestUrl() == "https://raw.githubusercontent.com/imLiaMxo/L-Shop-5/master/l-shop5.txt"){
+            Code = httpData()
+            if(fileCanWrite()){
+                fileWrite(">e2shared/"+"lshop5 - " + Config["NewVersion",string] + ".txt",Code)
+                debug("Saved file to: e2shared/"+"lshop5 - " + Config["NewVersion",string] + ".txt  !")
+                Update = 0
+            } else {
+                debug("Failed to download latest E2! Please do it manually! How to is on the github.")
+                debug("https://github.com/imLiaMxo/L-Shop-5/blob/master/README.md")
+                Update = 0
+            }
+        }
+    #else
+        debug("Cannot do this function due to HTTP functions not being available!")
+    #endif
+}
