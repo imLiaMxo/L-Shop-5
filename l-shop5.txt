@@ -706,6 +706,25 @@ if(chatClk(owner())){
             }
         }
     }
+    if(Cmd == "!checkupdate"){
+        hideChat(1)
+        #ifdef httpCanRequest()
+            CheckUpdate = 1
+            debug("Checking for update...")
+        #else
+            CheckUpdate = 0
+            debug("HTTP functions not available. This command will NOT work!")
+        #endif
+    }
+    if(Cmd == "!update"){
+        hideChat(1)
+        if(UpdateConf){
+            debug("Attempting to download update.")
+            Update = 1
+        } else {
+            debug("Please check for an update first.")
+        }
+    }
 }
 
 if(fileClk()){
