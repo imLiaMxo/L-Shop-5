@@ -21,6 +21,46 @@ if(first()){
     Config["ShipmentAmount",number] = 5 #<-- How many weapons in a shipment?
     Config["BackgroundColour",vector] = vec(0,128,128)
     
+    # Sound Config
+    Config["Sounds",table] = table(
+        "Welcome" = table(
+            "vo/npc/male01/hi01.wav",
+            "vo/npc/male01/hi02.wav",
+            "vo/npc/male01/heydoc01.wav",
+            "vo/npc/male01/heydoc02.wav"
+        ),
+        "Select" = table(
+            "vo/npc/male01/answer01.wav", # that's you all over
+            "vo/npc/male01/answer02.wav", # i won't hold it against ya
+            "vo/npc/male01/answer03.wav", # figures
+            "vo/npc/male01/answer04.wav", # try not to dwell on it
+            "vo/npc/male01/answer10.wav", # i wouldn't say that too louuuddd
+            "vo/npc/male01/answer13.wav", # i'm with you
+            "vo/npc/male01/answer14.wav", # you and me both
+            "vo/npc/male01/answer22.wav", # you never know
+            "vo/npc/male01/answer25.wav", # how bout that
+            "vo/npc/male01/answer32.wav", # right on
+            "vo/npc/male01/answer33.wav", # no argument there
+            "vo/npc/male01/answer34.wav", # don't forget hawaii
+            "vo/npc/male01/answer35.wav", # try not to let it get to ya
+            "vo/npc/male01/answer40.wav", # there's a first time for everything
+            "vo/npc/male01/evenodds.wav", # let's even the odds a little
+            "vo/npc/male01/fantastic01.wav", # fantastic
+            "vo/npc/male01/fantastic02.wav", # fantastic
+            "vo/npc/male01/nice.wav" # nice
+        ),
+        "Purchased" = table(
+            "vo/npc/male01/fantastic01.wav"
+        ),
+        "Cancelled" = table(
+            "vo/npc/male01/getgoingsoon.wav"
+        ),
+        "Banned" = table(
+            "vo/npc/male01/answer38.wav", #Leave it alone
+            "vo/npc/male01/answer39.wav"  #That's enough outta you
+        )
+    )
+    
     
     
     # Do not touch anything below here.
@@ -73,7 +113,7 @@ if(first()){
             )
         )
     )
-    Config["Version",string] = "1.0"
+    Config["Version",string] = "1.1"
     
     function number onClick(ID) {
         local Cursor = EGP:egpCursor(User)
@@ -767,11 +807,14 @@ if(State == 0){
     if(EGP["User",entity]:isPlayer()){
         User = EGP["User",entity]
         if(!Accounts:exists(User:steamID())){
+            soundPlay("vocal",0,Config["Sounds",table]["Welcome",table][randint(1,Config["Sounds",table]["Welcome",table]:count()),string])
             State = 2
         } else {
             if(Accounts[User:steamID(),table]["Banned",number]){
+                soundPlay("vocal",0,Config["Sounds",table]["Banned",table][randint(1,Config["Sounds",table]["Banned",table]:count()),string])
                 State = -2
             } else {
+                soundPlay("vocal",0,Config["Sounds",table]["Welcome",table][randint(1,Config["Sounds",table]["Welcome",table]:count()),string])
                 State = 1
             }
         }
@@ -926,11 +969,12 @@ if(State == 6){
     }
     
     if(moneyClk()){
+        soundPlay("vocal",0,Config["Sounds",table]["Purchased",table][randint(1,Config["Sounds",table]["Purchased",table]:count()),string])
         local Ply = moneyClkPlayer()
         Accounts[Ply:steamID(),table]["Balance",number] = (LastAmount + Add)
         State = 5
         Accounts:save(Config["SaveFile",string])
-    } elseif(moneyNoClk()){
+    } elseif(moneyNoClk()){soundPlay("vocal",0,Config["Sounds",table]["Cancelled",table][randint(1,Config["Sounds",table]["Cancelled",table]:count()),string])
         State = 5
     }
     
@@ -1029,6 +1073,7 @@ if(State == 9){
     }
     
     if(UpdatePage) {
+        soundPlay("vocal",0,Config["Sounds",table]["Select",table][randint(1,Config["Sounds",table]["Select",table]:count()),string])
         UpdatePage = 0
         EGP:egpSetText(84,"Page " + Page + " / " + Shipments:count())
         local Shipment = Shipments[Page, table]
@@ -1061,6 +1106,7 @@ if(State == 10){
     }
     
     if(moneyClk()){
+        soundPlay("vocal",0,Config["Sounds",table]["Purchased",table][randint(1,Config["Sounds",table]["Purchased",table]:count()),string])
         Accounts[User:steamID(),table]["Sold",number] = (Accounts[User:steamID(),table]["Sold",number] + 1)
         Accounts[User:steamID(),table]["Balance",number] = NewBalance
         State = 11
@@ -1068,6 +1114,7 @@ if(State == 10){
     }
     if(moneyNoClk()){
         State = 9
+        soundPlay("vocal_declined",0,Config["Sounds",table]["Cancelled",table][randint(1,Config["Sounds",table]["Cancelled",table]:count()),string])
     }
 }
 
