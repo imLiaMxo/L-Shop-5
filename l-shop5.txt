@@ -110,17 +110,28 @@ if(first()){
                 "- $1000",
                 "- $10000",
                 "- $100000"
+            ),
+            "AdminUI" = table(
+                "MainMenuText" = array(
+                    "Change Colour",
+                    "View Stock",
+                    "Edit Config",
+                    "Lock/Unlock Store"
+                )
             )
         )
     )
-    Config["Version",string] = "1.1"
     
-    function number onClick(ID) {
-        local Cursor = EGP:egpCursor(User)
+    ### END OF CONFIG
+    
+    Config["Version",string] = "1.2"
+    
+    function number wirelink:onClick(ID) {
+        local Cursor = This:egpCursor(User)
         
-        local Size = EGP:egpSize(ID) / 2
-        local A = EGP:egpPos(ID) + Size
-        local B = EGP:egpPos(ID) - Size
+        local Size = This:egpSize(ID) / 2
+        local A = This:egpPos(ID) + Size
+        local B = This:egpPos(ID) - Size
         local Max = max(A, B)
         local Min = min(A, B)
         return inrange(Cursor, Min, Max)
@@ -195,14 +206,24 @@ if(first()){
         printColor(vec(0,0,0), "[", vec(0,128,128), "L-Shop", vec(0,0,0), "]", vec(0,128,128), ": ", vec(255,255,255), S:replace("ulx psay", ""))
     }
     
+    function void refresh(){
+        if(State == 11 || State == -3){
+            debug("Attempt to refresh failed due actions being processed.")
+        } else {
+            State = 100
+            timer("setback",500)
+            debug("Refreshing...")
+        }
+    }
+    
     setName("L-Shop 5: Running As: " + Config["StoreTitle",string])
     State = -3
-    #State = 10
-    #User = owner()
     U:entity():setPos(entity():pos() + vec(0,0,25))
     U:entity():setAlpha(0)
     Accounts:load(Config["SaveFile",string])
+    Config["Locked",number] = 0
 }
+
 
 if(changed(round(State))){
     local State = round(State)
@@ -212,7 +233,7 @@ if(changed(round(State))){
     EGP:egpMaterial(1,"gui/gradient_down")
     EGP:egpColor(1,Config["BackgroundColour",vector])
     
-    if(State > 0){
+    if(State > 0 && State != 100){
         EGP:egpText(egpMaxObjects(),"Current User: ",vec2(256,480))
         EGP:egpSize(egpMaxObjects(),15)
         EGP:egpAlign(egpMaxObjects(),1)
@@ -259,6 +280,13 @@ if(changed(round(State))){
         EGP:egpSize(2,30)
     }
     
+    ## Refreshing Page
+    if(State == 100){
+        EGP:egpText(2,"Refreshing... Please Wait!",vec2(256,256))
+        EGP:egpSize(2,35)
+        EGP:egpAlign(2,1,1)
+    }
+    
     if(State == 0){
         if(!Config["Text",table]["Chat",table]["InitWelcome",table]["Done",number]){
             debug(Config["Text",table]["Chat",table]["InitWelcome",table]["String",string])
@@ -282,7 +310,7 @@ if(changed(round(State))){
         EGP:egpSize(7,35)
         EGP:egpAlign(7,1,7)
         
-        EGP:egpText(8,"Press USE here to begin!",vec2(256,281))
+        EGP:egpText(8,Config["Locked",number] ? "Store Currently Locked." : "Press USE here to begin!",vec2(256,281))
         EGP:egpSize(8,30)
         EGP:egpAlign(8,1,8)
         
@@ -716,6 +744,20 @@ if(chatClk(owner())){
         hideChat(1)
         createUser(findPlayerByName(Msg[2,string]):steamID())
     }
+    if(Cmd == "!lock"){
+        hideChat(1)
+        if(!Msg[2,string]){
+            debug("Invalid syntax...")
+        } else {
+            if(Msg[2,string] == "1" || Msg[2,string] == "0"){
+                Config["Locked",number] = Msg[2,string]:toNumber()
+                refresh()
+                debug(Config["Locked",number] ? "Store is now locked." : "Store is no longer locked.")
+            } else {
+                debug("!lock 1 to lock the store and !lock 0 to unlock the store.")
+            }
+        }
+    }
     if(Cmd == "!save"){
         hideChat(1)
         Accounts:save(FileName)
@@ -795,37 +837,47 @@ if(clk("finish_load")){
 if(clk("reset")){
     State = 0
     exit()
+}elseif(clk("setback")){
+    State = 0
+    debug("Refresh complete.")
 }
 
 if(State == -3){
     Percent = round(EGP:egpSize(3):x() * 100 / 390)
     EGP:egpSize(3,clamp(EGP:egpSize(3) + vec2(10,0), vec2(0,40),vec2(390, 40)))
     EGP:egpSetText(4,"Loading " + Config["SaveFile",string] + " " + Percent + "%")
+    
+    if(Percent == 100){
+        EGP:egpSetText(4,"L-Shop 5 Loaded!")
+    }
 }
 
 if(State == 0){
-    if(EGP["User",entity]:isPlayer()){
-        User = EGP["User",entity]
-        if(!Accounts:exists(User:steamID())){
-            soundPlay("vocal",0,Config["Sounds",table]["Welcome",table][randint(1,Config["Sounds",table]["Welcome",table]:count()),string])
-            State = 2
-        } else {
-            if(Accounts[User:steamID(),table]["Banned",number]){
-                soundPlay("vocal",0,Config["Sounds",table]["Banned",table][randint(1,Config["Sounds",table]["Banned",table]:count()),string])
-                State = -2
-            } else {
+    if(!Config["Locked",number]){
+        if(EGP["User",entity]:isPlayer()){
+            User = EGP["User",entity]
+            if(!Accounts:exists(User:steamID())){
                 soundPlay("vocal",0,Config["Sounds",table]["Welcome",table][randint(1,Config["Sounds",table]["Welcome",table]:count()),string])
-                State = 1
+                State = 2
+            } else {
+                if(Accounts[User:steamID(),table]["Banned",number]){
+                    soundPlay("vocal",0,Config["Sounds",table]["Banned",table][randint(1,Config["Sounds",table]["Banned",table]:count()),string])
+                    State = -2
+                } else {
+                    soundPlay("vocal",0,Config["Sounds",table]["Welcome",table][randint(1,Config["Sounds",table]["Welcome",table]:count()),string])
+                    State = 1
+                }
             }
         }
     }
 }
 
 # Checking if the wanker has ran away.
-if(State > 0 && User:isPlayer()){
+if(State > 0 && User:isPlayer() && State != 100){
     #Did the wanker run away?
     if(User:pos():distance(EGP:entity():pos()) > 250){
         #HeDid? Well fuck you.
+        Accounts:save(Config["SaveFile",string])
         State = 0
         exit()
     } else {
@@ -839,18 +891,18 @@ if(State == 1){
     #State 1 shit here
     local E = User:keyUse()
     if(changed(E) & E){
-        if(onClick(14)){ #Save'n'Exit
+        if(EGP:onClick(14)){ #Save'n'Exit
             Accounts:save(Config["SaveFile",string])
             State = 0
             exit()
         }
-        if(onClick(13)){ #Help'n'Info
+        if(EGP:onClick(13)){ #Help'n'Info
             State = 3
         }
-        if(onClick(11)){ #AccountManage
+        if(EGP:onClick(11)){ #AccountManage
             State = 5
         }
-        if(onClick(10)){ #EnterShop
+        if(EGP:onClick(10)){ #EnterShop
             if(Shipments:count() >= 1){
                 State = 9
                 Page = 1
@@ -872,13 +924,13 @@ if(State == 1){
 if(State == 2){
     local E = User:keyUse()
     if(changed(E) & E){
-        if(onClick(50)){
+        if(EGP:onClick(50)){
             # Yes clk
             createUser(User:steamID())
             #State = 1
             State = 0
         }
-        if(onClick(60)){
+        if(EGP:onClick(60)){
             # No clk
             State = 0
             exit()
@@ -889,7 +941,7 @@ if(State == 2){
 if(State == 3){
     local E = User:keyUse()
     if(changed(E) & E){
-        if(onClick(21)){
+        if(EGP:onClick(21)){
             State = 1
         }
     }
@@ -898,13 +950,13 @@ if(State == 3){
 if(State == 5){
     local E = User:keyUse()
     if(changed(E) & E){
-        if(onClick(27)){
+        if(EGP:onClick(27)){
             State = 6
         }
-        if(onClick(28)){
+        if(EGP:onClick(28)){
             State = 7
         }
-        if(onClick(34)){
+        if(EGP:onClick(34)){
             State = 1
         }
     }
@@ -915,50 +967,50 @@ if(State == 6){
     local LastAmount = Accounts[User:steamID(),table]["Balance",number]
     local E = User:keyUse()
     if(changed(E) & E){
-        if(onClick(40)){
+        if(EGP:onClick(40)){
             if(Add < Allowed){
                 Add += clamp(Allowed,Add,100)
             }
         }
-        if(onClick(41)){
+        if(EGP:onClick(41)){
             if(Add < Allowed){
                 Add += clamp(Allowed,Add,1000)
             }
         }
-        if(onClick(42)){
+        if(EGP:onClick(42)){
             if(Add < Allowed){
                 Add += clamp(Allowed,Add,10000)
             }
         }
-        if(onClick(43)){
+        if(EGP:onClick(43)){
             if(Add < Allowed){
                 Add += clamp(Allowed,Add,100000)
             }
         }
         
-        if(onClick(48)){
+        if(EGP:onClick(48)){
             if(Add > 0){
                 Add -= clamp(Allowed,0,100)
             }
         }
-        if(onClick(49)){
+        if(EGP:onClick(49)){
             if(Add > 0){
                 Add -= clamp(Allowed,0,1000)
             }
         }
-        if(onClick(50)){
+        if(EGP:onClick(50)){
             if(Add > 0){
                 Add -= clamp(Allowed,0,10000)
             }
         }
-        if(onClick(51)){
+        if(EGP:onClick(51)){
             if(Add > 0){
                 Add -= clamp(Allowed,0,100000)
             }
         }
         
         #Pay/Exit
-        if(onClick(56)){
+        if(EGP:onClick(56)){
             if(!Add){
                 State = 5
             } else {
@@ -990,49 +1042,49 @@ if(State == 7){
     local LastAmount = Accounts[User:steamID(),table]["Balance",number]
     local E = User:keyUse()
     if(changed(E) & E){
-        if(onClick(61)){
+        if(EGP:onClick(61)){
             if(Add < Allowed){
                 Add += clamp(Allowed,Add,100)
             }
         }
-        if(onClick(62)){
+        if(EGP:onClick(62)){
             if(Add < Allowed){
                 Add += clamp(Allowed,Add,1000)
             }        
         }
-        if(onClick(63)){
+        if(EGP:onClick(63)){
             if(Add < Allowed){
                 Add += clamp(Allowed,Add,10000)
             }
         }
-        if(onClick(64)){
+        if(EGP:onClick(64)){
             if(Add < Allowed){
                 Add += clamp(Allowed,Add,100000)
             }
         }
-        if(onClick(71)){
+        if(EGP:onClick(71)){
             if(Add > 0){
                 Add -= clamp(Allowed,0,100)
             }
         }
-        if(onClick(72)){
+        if(EGP:onClick(72)){
             if(Add > 0){
                 Add -= clamp(Allowed,0,1000)
             }
         }
-        if(onClick(73)){
+        if(EGP:onClick(73)){
             if(Add > 0){
                 Add -= clamp(Allowed,0,10000)
             }
         }
-        if(onClick(74)){
+        if(EGP:onClick(74)){
             if(Add > 0){
                 Add -= clamp(Allowed,0,100000)
             }
         }
         
         #Pay/Exit
-        if(onClick(81)){
+        if(EGP:onClick(81)){
             if(!Add){
                 State = 5
             } else {
@@ -1054,20 +1106,20 @@ if(State == 7){
 if(State == 9){
     local E = User:keyUse()
     if(changed(E) & E){
-        if(onClick(88)){
+        if(EGP:onClick(88)){
             Page--
             if(Page <= 0) {Page = Shipments:count()}
             UpdatePage = 1
         }
-        if(onClick(89)){
+        if(EGP:onClick(89)){
             Page++
             if(Page > Shipments:count()) {Page = 1}
             UpdatePage = 1
         }
-        if(onClick(90)){
+        if(EGP:onClick(90)){
             State = 10
         }
-        if(onClick(91)){
+        if(EGP:onClick(91)){
             State = 1
         }
     }
@@ -1088,7 +1140,7 @@ if(State == 9){
 if(State == 10){
     local E = User:keyUse()
     if(changed(E) & E){
-        if(onClick(97)){
+        if(EGP:onClick(97)){
             if(PriceB == 0){
                 State = 11
                 Accounts[User:steamID(),table]["Sold",number] = (Accounts[User:steamID(),table]["Sold",number] + 1)
@@ -1100,7 +1152,7 @@ if(State == 10){
                 #print(NewBalance)
             }
         }
-        if(onClick(98)){
+        if(EGP:onClick(98)){
             State = 9
         }
     }
@@ -1157,10 +1209,10 @@ if(State == 11){
     
     local E = User:keyUse()
     if(changed(E) & E){
-        if(onClick(101) && EGP:egpAlpha(101) == 255){
+        if(EGP:onClick(101) && EGP:egpAlpha(101) == 255){
             State = 10
         }
-        if(onClick(102) && EGP:egpAlpha(102) == 255){
+        if(EGP:onClick(102) && EGP:egpAlpha(102) == 255){
             State = 1
         }
     }
