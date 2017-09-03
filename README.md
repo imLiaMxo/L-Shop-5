@@ -10,5 +10,6 @@ Manual Installation:
 5. Go ingame, and get the Expression tool out, if you have just launched the game, you'll see the .txt file, if not you need to press the  'Update' button and then it shall appear.
 
 Changelog:
+* -> 1.2 Added Locking. Lock/Unlock store by typing !lock <1/0>. (03/09/2017, 18:11)
 * -> 1.1 Added Sound Configuration. (24/08/2017, 20:20)
 * -> 1.0 Inital Release. (23/08/2017, 23:08)
