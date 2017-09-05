@@ -124,7 +124,7 @@ if(first()){
     
     ### END OF CONFIG
     
-    Config["Version",string] = "1.2"
+    Config["Version",string] = "1.21"
     
     function number wirelink:onClick(ID) {
         local Cursor = This:egpCursor(User)
@@ -1132,7 +1132,7 @@ if(State == 9){
         holoModel(1,Shipment["model",string])
         EGP:egpSetText(85,Shipment["name",string])
         EGP:egpSetText(86,"Price: $" +round(Shipment["price", table]["price", number]))
-        EGP:egpSetText(87,"Remaining: " + Shipment["entity",entity]:shipmentAmount() + " / " + Config["ShipmentAmount",number])
+        EGP:egpSetText(87,"Remaining: " + Shipment["entity",entity]:shipmentAmount())
     }
 
 }
