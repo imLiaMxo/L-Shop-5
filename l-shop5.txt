@@ -19,7 +19,7 @@ if(first()){
     Config["MaxBalance",number] = 100000 #How much can people have in their account balance?
     Config["Profit",string] = "5%" #<-- How much profit will you take?
     Config["ShipmentAmount",number] = 5 #<-- How many weapons in a shipment?
-    Config["BackgroundColour",vector] = vec(0,128,128)
+    Config["BackgroundColour",vector] = vec(128,0,128)
     
     # Sound Config
     Config["Sounds",table] = table(
@@ -50,10 +50,10 @@ if(first()){
             "vo/npc/male01/nice.wav" # nice
         ),
         "Purchased" = table(
-            "vo/npc/male01/fantastic01.wav"
+            "vo/npc/male01/fantastic01.wav" # fantastic
         ),
         "Cancelled" = table(
-            "vo/npc/male01/getgoingsoon.wav"
+            "vo/npc/male01/getgoingsoon.wav" # get on going soon
         ),
         "Banned" = table(
             "vo/npc/male01/answer38.wav", #Leave it alone
@@ -78,6 +78,7 @@ if(first()){
                 "++++++++++++++++++++++",
                 "!help -- Shows this menu.",
                 "!adduser <name> -- Adds a user manually.",
+                "!deluser <name/steamid> -- Manually deletes user.",
                 "!addship -- Adds the shipment you're looking at.",
                 "!removeship -- Removes the shipment you're looking at.",
                 "!lban <name> <1/0> -- Bans the user from using the shop.",
@@ -124,7 +125,7 @@ if(first()){
     
     ### END OF CONFIG
     
-    Config["Version",string] = "1.21"
+    Config["Version",string] = "1.22"
     
     function number wirelink:onClick(ID) {
         local Cursor = This:egpCursor(User)
@@ -728,7 +729,7 @@ if(chatClk(owner())){
         if(owner():aimEntity():type() == "spawned_shipment") {
             local Ship = owner():aimEntity()
             if(Ship:type() != "spawned_shipment") {
-                hint("What the fuck are you trying to add?",5)
+                debug("What the fuck are you trying to add?")
             }
             for(I = 1, Shipments:count()) {
                 local Ent = Shipments[I, table]["entity", entity]
@@ -744,6 +745,31 @@ if(chatClk(owner())){
         hideChat(1)
         createUser(findPlayerByName(Msg[2,string]):steamID())
     }
+    if(Cmd == "!deluser"){
+        hideChat(1)
+        if(Msg[2,string]){
+            if(Msg[2,string]:sub(1,6) == "STEAM_"){
+                local Ply = findPlayerBySteamID(Msg[2,string])
+                if(Accounts:exists(Ply:steamID())){
+                    Accounts:remove(Ply:steamID())
+                    debug(Ply:name() + "'s account has been deleted.")
+                } else {
+                    debug("They don't even have an account.")
+                }
+            } else {
+                local Ply = findPlayerByName(Msg[2,string])
+                if(Accounts:exists(Ply:steamID())){
+                    Accounts:remove(Ply:steamID())
+                    debug(Ply:name() + "'s account has been deleted.")
+                } else {
+                    debug("They don't even have an account.")
+                }
+            }
+        } else {
+            debug("Cannot find " + Msg[2,string])
+        }
+    }
+            
     if(Cmd == "!lock"){
         hideChat(1)
         if(!Msg[2,string]){
