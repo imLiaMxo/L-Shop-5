@@ -7,7 +7,7 @@
 interval(100)
 runOnChat(1)
 runOnFile(1)
-runOnHTTP(1)
+#runOnHTTP(1)
 runOnLast(1)
 
 if(first()){
@@ -125,7 +125,7 @@ if(first()){
     
     ### END OF CONFIG
     
-    Config["Version",string] = "1.22"
+    Config["Version",string] = "1.23"
     
     function number wirelink:onClick(ID) {
         local Cursor = This:egpCursor(User)
@@ -592,7 +592,7 @@ if(changed(round(State))){
         holoCreate(1)
         holoModel(1,"models/props_c17/streetsign004e.mdl")
         holoPos(1,EGP:egpToWorld(vec2(256, 220)))
-        holoAng(1,EGP:entity():toWorld(ang(0, -90, 90)))
+        for(I=1,Shipments:count()){ if(!Shipments[I,entity]["model",string]:find("tfa")){holoAng(1,EGP:entity():toWorld(ang(0, -90, 90)))}else{holoAng(1,EGP:entity():toWorld(ang(0, 0, 0)))}}
         holoScale(1,vec(0.5))
         
     }
@@ -1188,7 +1188,7 @@ if(State == 10){
         Accounts[User:steamID(),table]["Sold",number] = (Accounts[User:steamID(),table]["Sold",number] + 1)
         Accounts[User:steamID(),table]["Balance",number] = NewBalance
         State = 11
-        #timer("init",100)
+        timer("init",100)
     }
     if(moneyNoClk()){
         State = 9
@@ -1196,7 +1196,7 @@ if(State == 10){
     }
 }
 
-if(State == 9 || State == 10){ holoAng(1,EGP:entity():toWorld(ang(0, -90 + (sin(curtime()*45)*15), 90))) } else { holoDelete(1) }
+if(State == 9 || State == 10){ if(!holoEntity(1):model():find("tfa")){holoAng(1,EGP:entity():toWorld(ang(0, -90 + (sin(curtime()*45)*15), 90))) } else { holoAng(1,EGP:entity():toWorld(ang(0, (sin(curtime()*45)*15), -90)))} } else { holoDelete(1) }
 
 if(State == 11){
     if(clk("init")){
